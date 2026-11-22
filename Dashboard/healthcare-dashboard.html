@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Healthcare Analytics & Risk Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ── Top Nav ── */
+    .navbar {
+      background: #161b27;
+      border-bottom: 1px solid #1e2535;
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .nav-logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+    .nav-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .nav-subtitle {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 1px;
+    }
+    .navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .nav-badge {
+      background: #1e2535;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .nav-badge span {
+      color: #3b82f6;
+      font-weight: 600;
+    }
+    .last-updated {
+      font-size: 11px;
+      color: #475569;
+    }
+
+    /* ── Layout ── */
+    .main {
+      padding: 24px 32px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    /* ── Filter Bar ── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .filter-label {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .filter-btn {
+      background: #1e2535;
+      border: 1px solid #2d3748;
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+    .filter-divider {
+      width: 1px; height: 20px;
+      background: #2d3748;
+    }
+    .dept-select {
+      background: #1e2535;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 5px 12px;
+      font-size: 12px;
+      color: #94a3b8;
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* ── KPI Row ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: #161b27;
+      border: 1px solid #1e2535;
+      border-radius: 12px;
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .kpi-card:hover { border-color: #3b82f6; }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 12px 12px 0 0;
+    }
+    .kpi-card.blue::before  { background: #3b82f6; }
+    .kpi-card.green::before { background: #22c55e; }
+    .kpi-card.amber::before { background: #f59e0b; }
+    .kpi-card.red::before   { background: #ef4444; }
+    .kpi-card.purple::before{ background: #8b5cf6; }
+
+    .kpi-label {
+      font-size: 11px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #f1f5f9;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .kpi-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .kpi-delta {
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .kpi-delta.up   { background: #14532d44; color: #4ade80; }
+    .kpi-delta.down { background: #7f1d1d44; color: #f87171; }
+    .kpi-delta.neutral { background: #1e293b; color: #94a3b8; }
+    .kpi-period { color: #475569; }
+
+    /* ── Grid layouts ── */
+    .row-2 {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .row-2b {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    /* ── Panel ── */
+    .panel {
+      background: #161b27;
+      border: 1px solid #1e2535;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    .panel-sub {
+      font-size: 11px;
+      color: #475569;
+      margin-top: 2px;
+    }
+    .panel-action {
+      font-size: 11px;
+      color: #3b82f6;
+      cursor: pointer;
+      border: 1px solid #1e3a5f;
+      padding: 3px 10px;
+      border-radius: 6px;
+    }
+    .panel-action:hover { background: #1e3a5f; }
+
+    /* ── Charts ── */
+    .chart-wrap {
+      position: relative;
+    }
+    canvas { max-width: 100%; }
+
+    /* ── Risk Table ── */
+    .risk-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .risk-table thead th {
+      text-align: left;
+      color: #475569;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 10.5px;
+      padding: 0 10px 10px 0;
+      border-bottom: 1px solid #1e2535;
+    }
+    .risk-table tbody tr {
+      border-bottom: 1px solid #1a2033;
+      transition: background 0.1s;
+    }
+    .risk-table tbody tr:hover { background: #1e2535; }
+    .risk-table tbody td {
+      padding: 9px 10px 9px 0;
+      color: #cbd5e1;
+    }
+    .risk-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .risk-high   { background: #7f1d1d44; color: #f87171; border: 1px solid #7f1d1d88; }
+    .risk-medium { background: #78350f44; color: #fbbf24; border: 1px solid #78350f88; }
+    .risk-low    { background: #14532d44; color: #4ade80; border: 1px solid #14532d88; }
+
+    .dept-badge {
+      background: #1e2535;
+      border: 1px solid #2d3748;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+
+    /* ── Readmission Rate Bar ── */
+    .dept-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .dept-name {
+      width: 90px;
+      font-size: 11px;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+    .dept-bar-bg {
+      flex: 1;
+      background: #1e2535;
+      border-radius: 4px;
+      height: 7px;
+      overflow: hidden;
+    }
+    .dept-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.6s ease;
+    }
+    .dept-pct {
+      width: 36px;
+      text-align: right;
+      font-size: 11px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    /* ── Severity Donut Legend ── */
+    .donut-layout {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .donut-wrap { flex-shrink: 0; }
+    .legend-list { flex: 1; }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .legend-name { flex: 1; color: #94a3b8; }
+    .legend-val { font-weight: 600; color: #e2e8f0; }
+    .legend-pct { color: #475569; font-size: 11px; }
+
+    /* ── Cost Breakdown ── */
+    .cost-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 0;
+      border-bottom: 1px solid #1a2033;
+      font-size: 12px;
+    }
+    .cost-row:last-child { border-bottom: none; }
+    .cost-dept { color: #94a3b8; }
+    .cost-amount { font-weight: 600; color: #e2e8f0; }
+    .cost-change { font-size: 11px; font-weight: 600; }
+    .cost-change.up   { color: #f87171; }
+    .cost-change.down { color: #4ade80; }
+    .cost-mini-bar {
+      width: 60px;
+      background: #1e2535;
+      border-radius: 3px;
+      height: 5px;
+      overflow: hidden;
+    }
+    .cost-mini-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #6366f1);
+      border-radius: 3px;
+    }
+
+    /* ── Footer strip ── */
+    .footer-strip {
+      background: #161b27;
+      border: 1px solid #1e2535;
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .strip-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+    .strip-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .strip-label { color: #475569; }
+    .strip-val { color: #94a3b8; font-weight: 600; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f1117; }
+    ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ── -->
+<nav class="navbar">
+  <div class="navbar-left">
+    <div class="nav-logo">🏥</div>
+    <div>
+      <div class="nav-title">Healthcare Analytics & Risk Dashboard</div>
+      <div class="nav-subtitle">12,431 synthetic hospital records · PostgreSQL · Power BI · DAX</div>
+    </div>
+  </div>
+  <div class="navbar-right">
+    <div class="nav-badge">Schema: <span>Star v2.1</span></div>
+    <div class="nav-badge">Records: <span>12K+</span></div>
+    <div class="nav-badge">Risk Flags: <span>1,847</span></div>
+    <div class="last-updated">Last refreshed: Nov 22, 2026 · 08:14 AM</div>
+  </div>
+</nav>
+
+<div class="main">
+
+  <!-- ── Filter Bar ── -->
+  <div class="filter-bar">
+    <span class="filter-label">Period</span>
+    <button class="filter-btn">7D</button>
+    <button class="filter-btn">30D</button>
+    <button class="filter-btn active">90D</button>
+    <button class="filter-btn">YTD</button>
+    <button class="filter-btn">12M</button>
+    <div class="filter-divider"></div>
+    <span class="filter-label">Department</span>
+    <select class="dept-select">
+      <option>All Departments</option>
+      <option>Cardiology</option>
+      <option>Neurology</option>
+      <option>Oncology</option>
+      <option>Orthopedics</option>
+      <option>ICU</option>
+    </select>
+    <div class="filter-divider"></div>
+    <span class="filter-label">Risk Level</span>
+    <button class="filter-btn">All</button>
+    <button class="filter-btn">High</button>
+    <button class="filter-btn">Medium</button>
+    <button class="filter-btn">Low</button>
+  </div>
+
+  <!-- ── KPI Row ── -->
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total Admissions</div>
+      <div class="kpi-value">12,431</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta up">+6.2%</span>
+        <span class="kpi-period">vs prior 90D</span>
+      </div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">30-Day Readmission</div>
+      <div class="kpi-value">14.8%</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta down">−1.3%</span>
+        <span class="kpi-period">vs prior 90D</span>
+      </div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Avg Length of Stay</div>
+      <div class="kpi-value">4.2d</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta down">−0.3d</span>
+        <span class="kpi-period">vs prior 90D</span>
+      </div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">High-Risk Flags</div>
+      <div class="kpi-value">1,847</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta up">+11.4%</span>
+        <span class="kpi-period">vs prior 90D</span>
+      </div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Avg Treatment Cost</div>
+      <div class="kpi-value">$9,214</div>
+      <div class="kpi-meta">
+        <span class="kpi-delta up">+2.1%</span>
+        <span class="kpi-period">vs prior 90D</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Row 1: Admissions trend + Severity Donut ── -->
+  <div class="row-2">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Admissions & Readmissions Over Time</div>
+          <div class="panel-sub">Monthly trend · 12-month window</div>
+        </div>
+        <span class="panel-action">Export CSV</span>
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="admissionsChart"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Severity Distribution</div>
+          <div class="panel-sub">By admission severity score</div>
+        </div>
+      </div>
+      <div class="donut-layout" style="height:220px; align-items:center;">
+        <div class="donut-wrap">
+          <canvas id="severityDonut" width="140" height="140"></canvas>
+        </div>
+        <div class="legend-list">
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#ef4444"></div>
+            <span class="legend-name">Critical</span>
+            <span class="legend-val">1,284</span>
+            <span class="legend-pct">&nbsp;10.3%</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#f59e0b"></div>
+            <span class="legend-name">Severe</span>
+            <span class="legend-val">3,017</span>
+            <span class="legend-pct">&nbsp;24.3%</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#3b82f6"></div>
+            <span class="legend-name">Moderate</span>
+            <span class="legend-val">5,122</span>
+            <span class="legend-pct">&nbsp;41.2%</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#22c55e"></div>
+            <span class="legend-name">Mild</span>
+            <span class="legend-val">3,008</span>
+            <span class="legend-pct">&nbsp;24.2%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Row 2: Dept Cost + Readmission by Dept + Avg LOS ── -->
+  <div class="row-3">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Treatment Cost by Department</div>
+          <div class="panel-sub">Total spend · 90-day window</div>
+        </div>
+        <span class="panel-action">Details</span>
+      </div>
+      <div>
+        <div class="cost-row">
+          <span class="cost-dept">ICU</span>
+          <div class="cost-mini-bar"><div class="cost-mini-fill" style="width:100%; background: linear-gradient(90deg,#ef4444,#f97316)"></div></div>
+          <span class="cost-amount">$4.2M</span>
+          <span class="cost-change up">+8.1%</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-dept">Cardiology</span>
+          <div class="cost-mini-bar"><div class="cost-mini-fill" style="width:81%"></div></div>
+          <span class="cost-amount">$3.4M</span>
+          <span class="cost-change up">+3.2%</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-dept">Oncology</span>
+          <div class="cost-mini-bar"><div class="cost-mini-fill" style="width:72%; background:linear-gradient(90deg,#8b5cf6,#6366f1)"></div></div>
+          <span class="cost-amount">$3.0M</span>
+          <span class="cost-change down">−1.4%</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-dept">Neurology</span>
+          <div class="cost-mini-bar"><div class="cost-mini-fill" style="width:55%; background:linear-gradient(90deg,#06b6d4,#3b82f6)"></div></div>
+          <span class="cost-amount">$2.3M</span>
+          <span class="cost-change down">−2.1%</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-dept">Orthopedics</span>
+          <div class="cost-mini-bar"><div class="cost-mini-fill" style="width:40%; background:linear-gradient(90deg,#22c55e,#16a34a)"></div></div>
+          <span class="cost-amount">$1.7M</span>
+          <span class="cost-change up">+0.8%</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-dept">Emergency</span>
+          <div class="cost-mini-bar"><div class="cost-mini-fill" style="width:30%; background:linear-gradient(90deg,#f59e0b,#d97706)"></div></div>
+          <span class="cost-amount">$1.3M</span>
+          <span class="cost-change up">+5.4%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">30-Day Readmission Rate</div>
+          <div class="panel-sub">By department · benchmark 15%</div>
+        </div>
+      </div>
+      <div style="padding-top:4px">
+        <div class="dept-row">
+          <div class="dept-name">ICU</div>
+          <div class="dept-bar-bg">
+            <div class="dept-bar-fill" style="width:85%; background:#ef4444"></div>
+          </div>
+          <span class="dept-pct" style="color:#f87171">24.1%</span>
+        </div>
+        <div class="dept-row">
+          <div class="dept-name">Cardiology</div>
+          <div class="dept-bar-bg">
+            <div class="dept-bar-fill" style="width:72%; background:#f59e0b"></div>
+          </div>
+          <span class="dept-pct" style="color:#fbbf24">19.8%</span>
+        </div>
+        <div class="dept-row">
+          <div class="dept-name">Oncology</div>
+          <div class="dept-bar-bg">
+            <div class="dept-bar-fill" style="width:62%; background:#f59e0b"></div>
+          </div>
+          <span class="dept-pct" style="color:#fbbf24">17.2%</span>
+        </div>
+        <div class="dept-row">
+          <div class="dept-name">Neurology</div>
+          <div class="dept-bar-bg">
+            <div class="dept-bar-fill" style="width:48%; background:#3b82f6"></div>
+          </div>
+          <span class="dept-pct" style="color:#60a5fa">13.4%</span>
+        </div>
+        <div class="dept-row">
+          <div class="dept-name">Orthopedics</div>
+          <div class="dept-bar-bg">
+            <div class="dept-bar-fill" style="width:38%; background:#22c55e"></div>
+          </div>
+          <span class="dept-pct" style="color:#4ade80">10.6%</span>
+        </div>
+        <div class="dept-row">
+          <div class="dept-name">Emergency</div>
+          <div class="dept-bar-bg">
+            <div class="dept-bar-fill" style="width:30%; background:#22c55e"></div>
+          </div>
+          <span class="dept-pct" style="color:#4ade80">8.3%</span>
+        </div>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px dashed #2d3748; font-size:11px; color:#475569; display:flex; align-items:center; gap:6px;">
+          <span style="color:#f59e0b; font-weight:600;">— 15%</span> National benchmark threshold
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Avg Length of Stay</div>
+          <div class="panel-sub">Days · by department</div>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="losChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Row 3: Risk flag table ── -->
+  <div class="row-2b">
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">High-Risk Patient Admissions</div>
+          <div class="panel-sub">Composite risk score: severity + age + LOS indicators</div>
+        </div>
+        <span class="panel-action">View All 1,847</span>
+      </div>
+      <table class="risk-table">
+        <thead>
+          <tr>
+            <th>Patient ID</th>
+            <th>Department</th>
+            <th>Age</th>
+            <th>LOS (d)</th>
+            <th>Severity</th>
+            <th>Risk Flag</th>
+            <th>Est. Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:#64748b; font-family:monospace; font-size:11px">PT-00482</td>
+            <td><span class="dept-badge">ICU</span></td>
+            <td>74</td>
+            <td>11</td>
+            <td style="color:#f87171">Critical</td>
+            <td><span class="risk-pill risk-high">HIGH</span></td>
+            <td style="color:#e2e8f0; font-weight:600">$42,800</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b; font-family:monospace; font-size:11px">PT-01163</td>
+            <td><span class="dept-badge">Cardiology</span></td>
+            <td>68</td>
+            <td>8</td>
+            <td style="color:#f87171">Critical</td>
+            <td><span class="risk-pill risk-high">HIGH</span></td>
+            <td style="color:#e2e8f0; font-weight:600">$31,200</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b; font-family:monospace; font-size:11px">PT-02841</td>
+            <td><span class="dept-badge">Oncology</span></td>
+            <td>59</td>
+            <td>14</td>
+            <td style="color:#fbbf24">Severe</td>
+            <td><span class="risk-pill risk-high">HIGH</span></td>
+            <td style="color:#e2e8f0; font-weight:600">$28,650</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b; font-family:monospace; font-size:11px">PT-03307</td>
+            <td><span class="dept-badge">Neurology</span></td>
+            <td>71</td>
+            <td>7</td>
+            <td style="color:#fbbf24">Severe</td>
+            <td><span class="risk-pill risk-medium">MED</span></td>
+            <td style="color:#e2e8f0; font-weight:600">$18,400</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b; font-family:monospace; font-size:11px">PT-04512</td>
+            <td><span class="dept-badge">ICU</span></td>
+            <td>82</td>
+            <td>9</td>
+            <td style="color:#f87171">Critical</td>
+            <td><span class="risk-pill risk-high">HIGH</span></td>
+            <td style="color:#e2e8f0; font-weight:600">$38,100</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b; font-family:monospace; font-size:11px">PT-05029</td>
+            <td><span class="dept-badge">Cardiology</span></td>
+            <td>63</td>
+            <td>5</td>
+            <td style="color:#60a5fa">Moderate</td>
+            <td><span class="risk-pill risk-medium">MED</span></td>
+            <td style="color:#e2e8f0; font-weight:600">$14,200</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b; font-family:monospace; font-size:11px">PT-06218</td>
+            <td><span class="dept-badge">Orthopedics</span></td>
+            <td>44</td>
+            <td>3</td>
+            <td style="color:#4ade80">Mild</td>
+            <td><span class="risk-pill risk-low">LOW</span></td>
+            <td style="color:#e2e8f0; font-weight:600">$7,900</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b; font-family:monospace; font-size:11px">PT-07741</td>
+            <td><span class="dept-badge">Emergency</span></td>
+            <td>55</td>
+            <td>2</td>
+            <td style="color:#60a5fa">Moderate</td>
+            <td><span class="risk-pill risk-low">LOW</span></td>
+            <td style="color:#e2e8f0; font-weight:600">$5,340</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Monthly Cost vs Readmissions</div>
+          <div class="panel-sub">Dual-axis · cost (bars) vs rate (line)</div>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="costReadmitChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <div class="footer-strip">
+    <div class="strip-item">
+      <div class="strip-dot" style="background:#3b82f6"></div>
+      <span class="strip-label">Data source:</span>
+      <span class="strip-val">PostgreSQL · normalized star schema</span>
+    </div>
+    <div class="strip-item">
+      <div class="strip-dot" style="background:#22c55e"></div>
+      <span class="strip-label">Pipeline:</span>
+      <span class="strip-val">Python · Pandas · CTEs · Window functions</span>
+    </div>
+    <div class="strip-item">
+      <div class="strip-dot" style="background:#8b5cf6"></div>
+      <span class="strip-label">BI Layer:</span>
+      <span class="strip-val">Power BI · DAX measures</span>
+    </div>
+    <div class="strip-item">
+      <div class="strip-dot" style="background:#f59e0b"></div>
+      <span class="strip-label">Risk model:</span>
+      <span class="strip-val">Severity + Age + LOS composite score</span>
+    </div>
+    <div class="strip-item">
+      <div class="strip-dot" style="background:#ef4444"></div>
+      <span class="strip-label">Duplicates resolved:</span>
+      <span class="strip-val">843 records cleaned</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Shared defaults ──
+  Chart.defaults.color = '#475569';
+  Chart.defaults.borderColor = '#1e2535';
+  Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+  Chart.defaults.font.size = 11;
+
+  // ── Admissions & Readmissions trend ──
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  new Chart(document.getElementById('admissionsChart'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: 'Admissions',
+          data: [920, 870, 1010, 980, 1050, 1120, 1080, 1140, 1090, 1200, 1030, 940],
+          backgroundColor: '#1e3a5f',
+          borderColor: '#3b82f6',
+          borderWidth: 1.5,
+          borderRadius: 4,
+          order: 2
+        },
+        {
+          label: 'Readmissions',
+          data: [138, 121, 147, 139, 152, 171, 158, 169, 161, 180, 148, 136],
+          backgroundColor: 'transparent',
+          borderColor: '#f59e0b',
+          borderWidth: 2,
+          type: 'line',
+          tension: 0.4,
+          pointBackgroundColor: '#f59e0b',
+          pointRadius: 3,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, padding: 16 } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#1e2535' }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+
+  // ── Severity Donut ──
+  new Chart(document.getElementById('severityDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Critical','Severe','Moderate','Mild'],
+      datasets: [{
+        data: [1284, 3017, 5122, 3008],
+        backgroundColor: ['#ef4444','#f59e0b','#3b82f6','#22c55e'],
+        borderColor: '#161b27',
+        borderWidth: 3,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: false,
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()}` } }
+      }
+    }
+  });
+
+  // ── LOS Bar Chart ──
+  new Chart(document.getElementById('losChart'), {
+    type: 'bar',
+    data: {
+      labels: ['ICU','Cardiology','Oncology','Neurology','Orthopedics','Emergency'],
+      datasets: [{
+        label: 'Avg LOS (days)',
+        data: [8.4, 5.9, 7.1, 4.8, 3.2, 1.9],
+        backgroundColor: ['#ef444455','#f59e0b55','#8b5cf655','#3b82f655','#22c55e55','#06b6d455'],
+        borderColor:      ['#ef4444',  '#f59e0b',  '#8b5cf6',  '#3b82f6',  '#22c55e',  '#06b6d4'],
+        borderWidth: 1.5,
+        borderRadius: 5
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#1e2535' }, ticks: { font: { size: 10 } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+
+  // ── Cost vs Readmission rate ──
+  new Chart(document.getElementById('costReadmitChart'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: 'Dept Cost ($K)',
+          data: [1240, 1180, 1420, 1310, 1510, 1680, 1590, 1720, 1640, 1890, 1530, 1410],
+          backgroundColor: '#1e3a5f',
+          borderColor: '#6366f1',
+          borderWidth: 1.5,
+          borderRadius: 3,
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          label: 'Readmission Rate %',
+          data: [15.0, 13.9, 14.6, 14.2, 15.3, 16.1, 15.6, 16.4, 15.8, 17.1, 15.1, 14.8],
+          backgroundColor: 'transparent',
+          borderColor: '#f59e0b',
+          borderWidth: 2,
+          type: 'line',
+          tension: 0.4,
+          pointBackgroundColor: '#f59e0b',
+          pointRadius: 3,
+          yAxisID: 'y1',
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, padding: 14, font: { size: 10 } } },
+        tooltip: { mode: 'index', intersect: false }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y:  {
+          type: 'linear', position: 'left',
+          grid: { color: '#1e2535' },
+          ticks: { font: { size: 10 }, callback: v => '$' + v }
+        },
+        y1: {
+          type: 'linear', position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: { font: { size: 10 }, callback: v => v + '%' }
+        }
+      }
+    }
+  });
+
+  // ── Filter button toggle ──
+  document.querySelectorAll('.filter-bar .filter-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const group = this.closest('.filter-bar');
+      const siblings = [...group.querySelectorAll('.filter-btn')];
+      const sameSection = siblings.filter(b => {
+        const thisPrev = prevDivider(this, siblings);
+        const bPrev    = prevDivider(b, siblings);
+        return thisPrev === bPrev;
+      });
+      sameSection.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+
+  function prevDivider(btn, all) {
+    const idx = all.indexOf(btn);
+    for (let i = idx - 1; i >= 0; i--) {
+      if (all[i].classList.contains('filter-divider')) return i;
+    }
+    return -1;
+  }
+</script>
+</body>
+</html>
